@@ -1,0 +1,15 @@
+**/__pycache__/
+*.py[cod]
+.venv/
+.env
+
+# Personal save files and generated analysis artifacts
+*.whs
+analysis-output/
+compendium-output/
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

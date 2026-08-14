@@ -1,0 +1,4 @@
+interface:
+  display_name: "KCD2 Save Chronicle"
+  short_description: "Decode saves into recaps or HTML compendiums"
+  default_prompt: "Use $summarize-kcd2-save to analyze my KCD2 save and create a spoiler-safe recap or encyclopedia."
