@@ -37,7 +37,7 @@ class UnpackedSave:
     header_text: str
     header: dict[str, str]
     payload: bytes
-    chunks: list[dict[str, int]]
+    chunks: list[dict[str, int | str | None]]
     footer_size: int
 
 
@@ -47,10 +47,12 @@ def _u32(data: bytes, offset: int) -> int:
     return struct.unpack_from("<I", data, offset)[0]
 
 
-def _parse_chunks(data: bytes, start: int, end: int) -> tuple[bytes, list[dict[str, int]]]:
+def _parse_chunks(
+    data: bytes, start: int, end: int
+) -> tuple[bytes, list[dict[str, int | str | None]]]:
     offset = start
     pieces: list[bytes] = []
-    chunks: list[dict[str, int]] = []
+    chunks: list[dict[str, int | str | None]] = []
     index = 0
     while offset < end:
         chunk_offset = offset
@@ -59,15 +61,29 @@ def _parse_chunks(data: bytes, start: int, end: int) -> tuple[bytes, list[dict[s
         compressed_size = _u32(data, offset)
         uncompressed_size = _u32(data, offset + 4)
         offset += 8
-        if compressed_size <= 0 or offset + compressed_size > end:
-            raise SaveFormatError(
-                f"invalid compressed size {compressed_size} at offset 0x{chunk_offset:x}"
-            )
-        compressed = data[offset : offset + compressed_size]
-        try:
-            decoded = zlib.decompress(compressed)
-        except zlib.error as exc:
-            raise SaveFormatError(f"zlib failure at offset 0x{offset:x}: {exc}") from exc
+        if compressed_size == 0xFFFFFFFF:
+            # Newer saves can interleave stored (uncompressed) chunks with zlib
+            # chunks. The marker replaces compressed_size; uncompressed_size is
+            # both the stored byte count and the decoded byte count.
+            encoding = "stored"
+            stored_size = uncompressed_size
+            if stored_size <= 0 or offset + stored_size > end:
+                raise SaveFormatError(
+                    f"invalid stored size {stored_size} at offset 0x{chunk_offset:x}"
+                )
+            decoded = data[offset : offset + stored_size]
+        else:
+            encoding = "zlib"
+            stored_size = compressed_size
+            if compressed_size <= 0 or offset + compressed_size > end:
+                raise SaveFormatError(
+                    f"invalid compressed size {compressed_size} at offset 0x{chunk_offset:x}"
+                )
+            compressed = data[offset : offset + compressed_size]
+            try:
+                decoded = zlib.decompress(compressed)
+            except zlib.error as exc:
+                raise SaveFormatError(f"zlib failure at offset 0x{offset:x}: {exc}") from exc
         if len(decoded) != uncompressed_size:
             raise SaveFormatError(
                 f"chunk {index} at 0x{chunk_offset:x}: expected {uncompressed_size} "
@@ -78,11 +94,14 @@ def _parse_chunks(data: bytes, start: int, end: int) -> tuple[bytes, list[dict[s
             {
                 "index": index,
                 "file_offset": chunk_offset,
-                "compressed_size": compressed_size,
+                "encoding": encoding,
+                "size_marker": compressed_size,
+                "stored_size": stored_size,
+                "compressed_size": compressed_size if encoding == "zlib" else None,
                 "uncompressed_size": uncompressed_size,
             }
         )
-        offset += compressed_size
+        offset += stored_size
         index += 1
     if offset != end:
         raise SaveFormatError(f"chunk stream ended at 0x{offset:x}, expected 0x{end:x}")
@@ -367,6 +386,10 @@ def analyze(args: argparse.Namespace) -> dict[str, Any]:
         "header": unpacked.header,
         "header_xml": unpacked.header_text,
         "chunk_count": len(unpacked.chunks),
+        "chunk_encodings": {
+            "zlib": sum(chunk["encoding"] == "zlib" for chunk in unpacked.chunks),
+            "stored": sum(chunk["encoding"] == "stored" for chunk in unpacked.chunks),
+        },
         "chunks": unpacked.chunks,
         "uncompressed_payload_size": len(unpacked.payload),
         "footer_size": unpacked.footer_size,

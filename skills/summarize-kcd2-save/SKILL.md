@@ -84,7 +84,8 @@ When the user asks for an HTML guide, encyclopedia, wiki, compendium, or returni
 
 ## Failure handling
 
-- If chunk validation or zlib decompression fails, stop and report the exact offset; do not attempt repair.
+- If chunk validation or zlib decompression fails, the initial analysis must stop and report the exact offset; do not attempt repair.
+- Do not equate an unfamiliar size marker with corruption. If the user explicitly authorizes compatibility investigation, follow the bounded, read-only format-extension procedure in `references/analysis-guide.md`, prove the next boundary, add a synthetic regression test, and validate the complete save before updating the installed parser.
 - If the game installation is unavailable, still parse the save and report unresolved keys. Search the exact key narrowly or request the game directory rather than guessing.
 - If evidence conflicts, choose the earlier safe boundary and explain the uncertainty.
 - If compendium validation fails, fix the content or builder input; do not hand off a partially linked site.
