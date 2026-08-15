@@ -17,6 +17,7 @@ It includes:
 - Localization and `Scripts.pak` inspection helpers
 - Written "game so far" recaps
 - Compact five-page HTML encyclopedia generation
+- Automatic persistent compendium refresh after each successful analysis
 - A strict boundary against unseen characters, places, twists, and outcomes
 
 ## Repository layout
