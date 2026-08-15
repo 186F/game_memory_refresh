@@ -12,11 +12,12 @@ The collection is organized so support for additional games can be added without
 
 It includes:
 
-- Read-only `.whs` parsing and chunk validation
+- Read-only `.whs` parsing and strict mixed zlib/stored chunk validation
 - Quest, dialogue, character, choice, and build-state evidence extraction
 - Localization and `Scripts.pak` inspection helpers
 - Written "game so far" recaps
 - Compact five-page HTML encyclopedia generation
+- Automatic persistent compendium refresh after each successful analysis
 - A strict boundary against unseen characters, places, twists, and outcomes
 
 ## Repository layout
@@ -57,6 +58,14 @@ New game integrations should follow the same operating principles:
 6. Validate the skill and test its output before publishing changes.
 
 Game-specific parsing logic should stay inside that game''s skill rather than becoming a shared assumption.
+
+## Validation
+
+The KCD2 parser has standard-library regression coverage for legacy zlib-only streams, mixed zlib/stored streams, and invalid stored-chunk boundaries:
+
+```powershell
+python -B -m unittest discover -s .\skills\summarize-kcd2-save\tests -v
+```
 
 ## Disclaimer
 

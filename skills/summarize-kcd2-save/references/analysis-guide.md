@@ -11,13 +11,30 @@ The observed PC format is:
 1. Little-endian `uint32` marker `0xffffffff`.
 2. Little-endian `uint32` byte length of an XML header.
 3. UTF-8 XML header, normally including a trailing NUL.
-4. Repeated chunks, each encoded as:
-   - compressed size: little-endian `uint32`
+4. Repeated chunks, each beginning with:
+   - size marker: little-endian `uint32`
    - uncompressed size: little-endian `uint32`
-   - zlib-compressed bytes
-5. An observed 64-byte opaque footer: roughly 20 nonzero bytes followed by zero padding.
+5. The chunk payload depends on the size marker:
+   - Any value other than `0xffffffff` is the byte length of a zlib-compressed payload.
+   - `0xffffffff` marks a stored chunk. Its payload is raw, uncompressed data whose byte length is the declared uncompressed size.
+6. An observed 64-byte opaque footer: roughly 20 nonzero bytes followed by zero padding.
 
-Validate every declared size and every zlib result. Do not repair or rewrite the source save. The decompressed payload is a proprietary binary serialization containing recoverable strings and an XML-like `ConceptState` tree.
+Stored and zlib chunks may be interleaved in the same save. Validate every declared size, every zlib result, every computed next-chunk boundary, and the final footer boundary. A `0xffffffff` value at a chunk boundary is not by itself evidence of corruption.
+
+Do not repair or rewrite the source save. The decompressed payload is a proprietary binary serialization containing recoverable strings and an XML-like `ConceptState` tree.
+
+### Read-only format-extension diagnosis
+
+If validation stops at an unfamiliar size marker, the first analysis attempt must stop and report the exact offset. Continue only when the user explicitly authorizes compatibility investigation:
+
+1. Inspect a small, bounded byte window around the failing offset without writing to the save.
+2. Decode the candidate size marker and uncompressed size as little-endian `uint32` values.
+3. Test a format hypothesis only when it yields an exact next boundary. For a stored chunk, advance by eight header bytes plus the declared uncompressed size.
+4. Require the computed boundary to contain another valid chunk header or to equal the validated stream end before accepting the hypothesis.
+5. Implement the extension in a working parser copy first. Add a synthetic regression fixture that combines the old and new encodings.
+6. Parse the complete real save, validate every chunk and the footer, and compare the safe-summary result before updating the installed parser.
+
+This process distinguishes an unsupported but internally consistent container variant from a damaged or truncated file. It does not authorize repair.
 
 ### Installed game data
 
@@ -63,7 +80,7 @@ Use calibrated language: “the save confirms” for direct high-confidence evid
 ## Analysis procedure
 
 1. Parse the header and record save version, build, location/map, play time, and current quest localization key.
-2. Decompress all chunks and reconstruct the tokenized `<Roots>...</Roots>` concept-state document. Preserve raw binary only as an optional analysis artifact.
+2. Decode all zlib and stored chunks, concatenate their uncompressed payloads, and reconstruct the tokenized `<Roots>...</Roots>` concept-state document. Preserve raw binary only as an optional analysis artifact.
 3. Resolve the header key through localization. For generated quest keys such as `qname_prepadeni_KsSs`, remove `qname_` and the final random four-character suffix to obtain the likely internal root `_prepadeni`.
 4. Locate that quest root in `ConceptState`. Inspect its objective logs, used sequences, explicit state transitions, and related saved results.
 5. Find the most recent player-facing objective update. This is the spoiler boundary unless another timestamped sequence clearly advances it.

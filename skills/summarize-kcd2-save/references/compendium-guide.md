@@ -1,6 +1,15 @@
 # KCD2 save compendium guide
 
-Read this file when the user asks for an HTML guide, encyclopedia, compendium, wiki, returning-player site, or multi-page “game so far” artifact.
+Read this file after every successful save analysis unless the user explicitly opts out of creating or updating HTML.
+
+## Automatic refresh contract
+
+- Keep one persistent compendium synchronized with the latest analyzed save; do not require a separate HTML request.
+- Reuse paths established by the previous run. Otherwise use `kcd2-compendium-content.json` and `kcd2-compendium/` in the writable workspace.
+- Update the vetted content JSON in place, using the same private evidence table and spoiler boundary as the prose recap.
+- Treat the latest analyzed save as authoritative. If it is earlier or from another playline, remove claims that are no longer evidenced.
+- Create a dated or alternate copy only when the user asks for an archive or separate edition.
+- Open the result only when requested, but always return the generated `index.html` path.
 
 ## Construction workflow
 
@@ -13,7 +22,7 @@ Read this file when the user asks for an HTML guide, encyclopedia, compendium, w
    python scripts/build_compendium.py --content "C:\path\compendium.json" --output "C:\path\kcd2-compendium"
    ```
 
-   The builder copies reusable assets from `assets/compendium/`, generates five pages, and validates local links and anchors. Add `--force` only for a known generated compendium directory.
+   The builder copies reusable assets from `assets/compendium/`, generates five pages, and validates local links and anchors. During refresh, add `--force` only after verifying the target is the known generated compendium directory.
 5. Open `index.html` when requested. Preserve earlier user-authored artifacts unless replacement is explicit.
 
 ## Content schema
